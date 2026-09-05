@@ -6,8 +6,6 @@
       "version": "1.20.10",
       "versionCode": 12010,
       "url": "https://ghfast.top/https://raw.githubusercontent.com/ant-video/ant-video/refs/heads/main/mini-app/market/zip/logvar-danmu-v12010.zip",
-      "md5": "3087d3d46db53e62964874a0a13a4f66",
-      "size": 410476,
       "author": "huangxd-",
       "description": "弹幕聚合服务跑在宿主内，兼容弹弹play 接口，不用另外部署 vercel/docker。装完把播放器的弹幕 API 填成 miniapp://com.logvar.danmu 即可。基于 huangxd-/danmu_api（AGPL-3.0），源码指引见包内 SOURCE.md"
     },
