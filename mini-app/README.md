@@ -20,6 +20,7 @@ mini-app/
 │  ├─ web-links/                   容器内导航与外部网站跳转
 │  ├─ online-site/                 manifest-only 在线站点示例
 │  ├─ cms-t4-bridge/               CMS JSON → T4 兼容反向服务
+│  ├─ source-t4-bridge/            宿主采集源 → T4 兼容反向服务
 │  ├─ tetris/                      俄罗斯方块（纯前端游戏 + TV 遥控）
 │  └─ emby/                        影视库（多页面 + 采集源 + 播放 + 续播）
 ├─ market/
@@ -38,6 +39,7 @@ mini-app/
 | **网页跳转示例** `miniapps/web-links/` | `com.leospring.web_links` | ui / navigate | 对比同源容器导航、外部 HTTPS 网站和系统协议的确认流程 |
 | **在线站点示例** `miniapps/online-site/` | `com.leospring.online_site` | — | 只有 manifest，直接包装 HTTPS 站点并使用宿主广告过滤 |
 | **CMS 转 T4 服务** `miniapps/cms-t4-bridge/` | `com.leospring.cms_t4_bridge` | ui / storage / network / service | 配置多个 CMS JSON 接口，按 `site` 提供 T4 首页、分类、搜索、详情和 `config` 接口，页面给出可复制的内部与局域网地址 |
+| **采集源转 T4 服务** `miniapps/source-t4-bridge/` | `com.leospring.source_t4_bridge` | ui / storage / service / source | 复用宿主已配置的采集源，按 `site` 提供 T4 首页、分类、搜索、详情和播放接口（爬虫源由宿主解析），页面给出可复制的内部与局域网地址 |
 | **俄罗斯方块** `miniapps/tetris/` | `com.leospring.tetris` | ui / storage / navigate | 掌机复刻，Web Audio 音效 + LCD 光影；自带 `ant-mock.js`，浏览器里直接能玩 |
 | **影视库** `miniapps/emby/` | `com.leospring.emby` | ui / storage / navigate / player / source | Emby 风格四页面（首页 / 媒体库 / 搜索 / 详情），复用宿主已配置的采集源，续播记录存 `ant.storage` |
 
