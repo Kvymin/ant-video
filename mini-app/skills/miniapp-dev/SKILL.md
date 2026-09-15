@@ -170,7 +170,7 @@ ant.clipboard.get/set(text)                                                     
 ant.navigateTo/redirectTo(url) · navigateBack() · exitMiniApp()                  [navigate]
 ant.miniApp.open({appId,path?,params?})                                           [miniapp]
 ant.miniApp.getLaunchOptions() · onOpen(fn)                                      [免权限]
-ant.player.open({url,title,headers}) · getState() · onStateChange(fn) · onClose(fn) [player]
+ant.player.open({url,title,headers,sniff}) · getState() · onStateChange(fn) · onClose(fn) [player]
 ant.source.list() · home(siteKey) · category({siteKey,tid,page,ext})
          · detail({siteKey,id}) · play({siteKey,flag,id}) · search({siteKey,wd,page})  [source]
 ant.serve(async req => resp)             // 宿主反过来调你，见下                  [service]
@@ -179,7 +179,9 @@ ant.on/off/once(event, fn) · onShow(fn) · onHide(fn) · tv.onKey(fn)
 
 事件：`app.show`、`app.hide`、`miniApp.open`、`player.open`、`player.stateChange`、`player.close`、`keydown`。
 `ant.player.open` 的 `headers` 是取流请求头（`source.play` 返回的 `header` 可原样传，单数也认，
-上限 32 条 / 单值 8192 字符）；外挂字幕仍不支持。它是整页跳转，退出会收到
+上限 32 条 / 单值 8192 字符）；`play.parse` / `play.jx` 为 `'1'` 的线路拿到的是网页地址，把整份
+`play` 原样交给 `ant.player.open()`，宿主会跑解析器和网页嗅探；自己抓的站点可用 `sniff: true`
+显式声明嗅探。外挂字幕仍不支持。它是整页跳转，退出会收到
 `player.close`。采集源返回宿主内部的 `vod_*` 蛇形字段；用户可能一个站点都没配，`list()` 要按空数组处理。
 
 `responseType: 'base64'` 才能拿到原始字节（protobuf / gzip / brotli / GBK 网页必须用它，

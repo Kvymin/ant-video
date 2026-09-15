@@ -1,23 +1,17 @@
-# ant JSAPI 参考（SDK v3）
+# ant JSAPI 参考（SDK v4）
 
 本文件是 skill 自带的完整参考，**不依赖宿主仓库**。在宿主仓库里工作时可以额外读
 `docs/miniapp/` 下的三篇文档（更细，含技术设计与实战示例），行为有疑问时以宿主的
 `assets/miniapp/ant-sdk.js` 与 `lib/miniapp/bridge/` 为准。
 
-`ant.version` / `getSystemInfo().sdkVersion` 现在是 `3`。v3 相对 v2 加了
-`ant.miniApp.open/getLaunchOptions/onOpen` 与 `miniapp` 权限；v2 加入的是二进制请求、
-`ant.serve` 与 `service` 权限。老宿主上新增对象会是 `undefined`，要兼容就先判断版本。
+`ant.version` / `getSystemInfo().sdkVersion` 现在是 `4`。老宿主上新增的东西是
+`undefined` 或被忽略，要兼容就先判一下版本：
 
-## 目录
-
-- [manifest.json](#manifestjson)
-- [权限](#权限)
-- [API](#api)
-- [完整看片链路](#完整看片链路)
-- [错误码](#错误码)
-- [硬限制汇总](#硬限制汇总)
-- [分发（市场 JSON）](#分发市场-json)
-- [mock 与真机的行为差异](#mock-与真机的行为差异)
+| 版本 | 新增 |
+|---|---|
+| v2 | `ant.request` 的 `responseType` / `followRedirects`、`ant.requestBytes`、`ant.base64ToBytes`、`ant.serve` 与 `service` 权限 |
+| v3 | `ant.miniApp.open` / `getLaunchOptions` / `onOpen` 与 `miniapp` 权限 |
+| v4 | `ant.player.open` 收 `sniff` 与 `source.play` 的解析字段：`parse`/`jx` 为 `'1'` 的线路能交给宿主嗅探 |
 
 ## manifest.json
 
@@ -47,10 +41,6 @@
 | `*.example.com` | `api.example.com`、`a.b.example.com`，**也包括** `example.com` 自身 | 同左 |
 | `api.foo.cn` | 精确匹配（大小写不敏感） | 同左 |
 
-在线站点型小程序默认启用宿主广告过滤：请求层拦常见广告厂商和典型广告资源 URL，页面层隐藏
-横幅、信息流、插屏与视频广告控件。规则只由宿主维护；页面被误伤时，用户可在「小程序设置 →
-在线网站广告过滤」关闭，结束实例后重新打开生效。包内小程序不会套用这些通用选择器。
-
 ## 权限
 
 | id | 覆盖的 API |
@@ -59,17 +49,15 @@
 | `storage` | `ant.storage.*` |
 | `network` | `ant.request`、`ant.requestJson`、`ant.requestBytes` |
 | `navigate` | `ant.navigateTo` / `redirectTo` / `navigateBack` / `exitMiniApp` |
-| `miniapp` | `ant.miniApp.open`（打开其它已安装小程序） |
 | `player` | `ant.player.*` |
 | `source` | `ant.source.*` |
 | `service` | `ant.serve`（反过来给宿主提供 HTTP 服务） |
 
-`ant.env.getSystemInfo()`、`ant.log()`、`ant.on/off/once`、`ant.tv.onKey`、
-`ant.miniApp.getLaunchOptions/onOpen` 不需要权限。
+`ant.env.getSystemInfo()`、`ant.log()`、`ant.on/off/once`、`ant.tv.onKey` 不需要权限。
 
-大多数权限声明后直接可用；`miniapp` 会把用户带到另一个应用，因此
-`ant.miniApp.open` 每次仍显示来源与目标名称让用户确认。没声明就调用会 reject 一个
-`code === 'PERMISSION_DENIED'` 的 Error。按需申请：声明了却不用的权限只会让用户更警惕。
+**声明了就直接可用**，运行期不再弹二次确认（安装页与详情页已完整展示过权限列表）。
+没声明就调用会 reject 一个 `code === 'PERMISSION_DENIED'` 的 Error。按需申请：声明了却不用
+的权限只会让用户更警惕。
 
 `service` 比其它几个重：声明了它的小程序会被宿主在**用户没打开它的时候**后台拉起。
 没有这个需求就别写。
@@ -174,46 +162,23 @@ await ant.exitMiniApp();                       // 关掉整个小程序
 
 物理返回键 / 手势返回 / 桌面 Esc 会先走 WebView 历史栈，没历史了才退出容器，不用自己处理。
 
-### 打开其它小程序
-
-来源 manifest 必须声明 `miniapp`；目标只需已经安装，不需要声明接收权限：
-
-```js
-const result = await ant.miniApp.open({
-  appId: 'com.example.target',
-  path: 'pages/detail.html?id=7', // 可省略；相对目标入口
-  params: { id: 7, from: 'recommend' }
-});
-// { opened:true, appId, name, resumed, path? }
-// 用户取消时 resolved 为 { opened:false, ... }，不是异常。
-```
-
-只有当前可见的前台小程序能发起；目标必须已安装，宿主每次都会向用户确认。目标已在后台时
-复用原 WebView，`resumed` 为 true；带 `path` 时切换页面，不带则保持原页面。
-`path` 不能跨 origin、不能越出包目录，`params` 必须是 JSON 对象且不超过 64KB。
-
-目标页尽早订阅 `onOpen`，并主动读取最近一次参数：
-
-```js
-ant.miniApp.onOpen(function (options) {
-  console.log(options.sourceAppId, options.sourceAppName, options.path, options.params);
-});
-
-const options = await ant.miniApp.getLaunchOptions();
-// 从小程序中心直接启动时为 null
-```
-
 ### 播放器
 
 把地址交给宿主播放页，自动复用 M3U8 代理、去广告、内核切换整条链路。
 
 ```js
 await ant.player.open({ url: 'https://.../movie.m3u8', title: '片名' });
-// → { route, url }；地址不可播放时 reject INVALID_URL
+// → { route, url, sniff }；地址不可播放时 reject INVALID_URL
 
 // 鉴权 / 防盗链源：带取流请求头（source.play 返回的 header 可原样传，单数也认）
 await ant.player.open({ url, title: '片名', headers: { Referer: 'https://site.com/', Cookie: 'sid=...' } });
-// → { route, url, headerKeys }
+// → { route, url, sniff, headerKeys }
+
+// 要宿主解析的线路（source.play 的 parse / jx 为 '1'，url 是网页地址）：
+// 把整份结果传回去，宿主跑解析器竞速 + WebView 嗅探（v4 起）
+await ant.player.open({ ...play, url: play.url, title: '片名', headers: play.header });
+// 自己抓的站点没有这些字段时，显式声明「这是网页地址」
+await ant.player.open({ url: 'https://site.com/watch/1', title: '片名', sniff: true });
 
 const state = await ant.player.getState();
 // { active:false } 或 { active:true, playing, position, duration }（毫秒）
@@ -225,6 +190,10 @@ off();   // 取消监听
 
 `headers` 会一路带到播放器内核与 M3U8 代理（分片取流也带）。上限 32 条、单值 8192 字符，
 `Host` / `Content-Length` / `Connection` 被丢弃，超限 reject `INVALID_PARAMS`。
+解析字段透传 `parse` / `jx` / `playUrl` / `flag` / `jxFrom` / `key`（决定宿主挑哪些解析源、
+嗅探时用哪份点击规则）；`click` 不收——宿主会去把规则地址读回来，只认站点自己配的那份。
+要宿主解析时 `url` 与 `playUrl` 必须是 http/https 且不能指向本机/内网（同 `ant.request`），
+否则 `INVALID_URL` / `FORBIDDEN_HOST`；直链播放不受此限。
 外挂字幕暂不支持。播放是整页跳转，退出后回到小程序并收到 `player.close`。
 `stateChange` 由宿主按 500ms 节流推送。
 
@@ -328,7 +297,7 @@ ant.once('player.close', () => {});
 ant.off('player.stateChange');           // 移除该事件的所有监听
 ```
 
-事件表：`app.show`、`app.hide`、`miniApp.open`、`player.open`、`player.stateChange`、`player.close`、`keydown`。
+事件表：`app.show`、`app.hide`、`player.open`、`player.stateChange`、`player.close`、`keydown`。
 
 ### TV 遥控
 
@@ -398,14 +367,12 @@ async function playFirstMatch(keyword) {
   const info = await ant.source.play({
     siteKey: site.key, flag: line.name, id: line.episodes[0].id
   });
-  // parse/jx 为 '1' 表示需要宿主内置嗅探，小程序里放不了，得换线路
-  if (String(info.parse) === '1' || String(info.jx) === '1') {
-    return ant.ui.toast('这条线路需要宿主解析，换一条试试');
-  }
   const url = Array.isArray(info.url)
     ? info.url.find(u => /^https?:/i.test(u)) : String(info.url || '');
-  // info.header 是这条源的取流头，一起交给播放器，鉴权/防盗链源才播得动
+  // info.header 是这条源的取流头，一起交给播放器，鉴权/防盗链源才播得动。
+  // parse / jx 为 '1' 时 url 是网页地址：整份 info 传回去，宿主会解析 + 嗅探。
   await ant.player.open({
+    ...info,
     url: url,
     title: vod.vod_name + ' · ' + line.episodes[0].name,
     headers: info.header
@@ -432,10 +399,6 @@ try { await ant.request({ url: '...' }); } catch (e) { console.log(e.code, e.mes
 | `QUOTA_EXCEEDED` | `ant.storage` 超 5MB | 清理旧数据 |
 | `INVALID_KEY` | storage key 为空或超 256 字符 | — |
 | `CROSS_ORIGIN` | 想跳到小程序之外的地址 | 把域名写进 `network.allowlist`，或用 `<a target="_blank">` 让用户确认后走浏览器 |
-| `APP_NOT_INSTALLED` | `miniApp.open` 的目标尚未安装 | 先引导用户安装目标 |
-| `SAME_APP` | 用 `miniApp.open` 打开自身 | 改用 `navigateTo` |
-| `NOT_FOREGROUND` | 后台或被其它页面遮住时尝试打开小程序 | 回到前台后由用户操作触发 |
-| `BUSY` | 上一次跨小程序确认尚未结束 | 等待前一次调用结束 |
 | `UNAVAILABLE` | 宿主对应模块未就绪 | 降级处理 |
 | `SITE_NOT_FOUND` / `SITE_UNAVAILABLE` | siteKey 不存在 / 站点没有可用接口 | 先 `source.list()` 拿真实 key |
 | `TOO_MANY_REQUESTS` | 采集源并发超过 3 | 串行化请求 |
@@ -456,7 +419,6 @@ try { await ant.request({ url: '...' }); } catch (e) { console.log(e.code, e.mes
 | 被忽略的请求头 | `host`、`content-length`、`connection` |
 | storage | 配额 5MB，key ≤256 字符，按 appId 隔离 |
 | 采集源 | 单次 60s 超时，并发上限 3 |
-| 跨小程序启动参数 | `params` 为 JSON 对象且编码后 ≤64KB；`path` ≤2048 字符 |
 | 反向服务 | 单次 60s 超时，请求体 ≤1MB；同时保活的实例总数 3 个 |
 | 包体 | 单文件 ≤20MB，解压后 ≤100MB，文件数 ≤2000，不能有符号链接 |
 
@@ -491,7 +453,6 @@ zip 传到任何能直链下载的地方，再给一个 JSON 列表地址，用�
 | `ant.request` 二进制 | `responseType:'base64'` 走 `arrayBuffer` 自己编码 | 宿主直接给 base64 |
 | 域名白名单 | 不检查 | 检查 `network.allowlist` |
 | 权限门禁 | 只在配了 `__antMockPermissions` 时检查 | 始终按 manifest 检查 |
-| `ant.miniApp.open` | confirm 后返回模拟结果，不会真的切换 | 用户确认后启动或复用已安装目标 |
 | `ant.storage` | `localStorage` | 文件，5MB 配额 |
 | `ant.player.open` | 页面内 `<video>` | 宿主全屏播放页（含 M3U8 代理与去广告） |
 | `ant.player.open` 的 `headers` | 发不出去（只警告） | 带到内核与代理 |
@@ -503,4 +464,7 @@ zip 传到任何能直链下载的地方，再给一个 JSON 列表地址，用�
 | 安全区 | 无 | 有，需要 `env(safe-area-inset-*)` |
 | TV 按键 | 真键盘 | 遥控器，只转发 5 个键 |
 | 背景色 | 浏览器白底 | **WebView 透明**，不设 `body` 背景会透出宿主背景图 |
+
+
+
 

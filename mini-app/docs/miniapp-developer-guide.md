@@ -309,6 +309,25 @@ await ant.player.open({ url: play.url, title: '片名', headers: play.header });
 
 限制：最多 32 条，单个值最长 8192 字符，`Host` / `Content-Length` / `Connection` 会被丢弃（由播放器自己算）。超限报 `INVALID_PARAMS`。
 
+**需要宿主解析的线路（`parse` / `jx` 为 `'1'`）。** 这时 `play.url` 是网页地址而不是媒体直链，得靠宿主的解析器 + 网页嗅探取真实地址——小程序自己做不到。做法是把整份 `play` 传回去，别只挑 `url`：
+
+```js
+const play = await ant.source.play({ siteKey, flag: line.name, id: episode.id });
+await ant.player.open({ ...play, url: play.url, title: '片名', headers: play.header });
+// 宿主按 parse / jx / playUrl / flag / jxFrom / key 决定跑哪些解析源，
+// 都不命中就退回网页嗅探。返回值的 sniff 字段说明这次是不是走了这条路。
+```
+
+自己抓站点、手里没有这些 TVBox 字段时，用 `sniff` 显式声明「这是个网页地址，请宿主嗅探」：
+
+```js
+await ant.player.open({ url: 'https://site.com/watch/123', title: '片名', sniff: true });
+```
+
+播放页里这条线路显示成 `嗅探`，嗅探不出来用户可以手动切 `直链` 再试。
+
+两点限制只在要宿主解析时生效：`url` 与 `playUrl` 必须是 http/https 且不能指向本机或内网（和 `ant.request` 同一套判定），否则报 `INVALID_URL` / `FORBIDDEN_HOST`；`click` 字段不接受（宿主只认站点自己配的点击规则，传 `key` 指过去）。直链播放不受影响。
+
 外挂字幕暂不支持。播放是整页跳转，退出后回到小程序（会收到 `player.close`）。
 
 ### 4.7 采集源
@@ -333,6 +352,7 @@ const found  = await ant.source.search({ siteKey, wd: '关键词', page: 1 });
 - 用户可能一个站点都没配，`list()` 返回空数组要处理
 - 单次调用超时 60s，同时最多 3 个在飞，超了 reject `TOO_MANY_REQUESTS`
 - 拿到 `play` 的地址后接 `ant.player.open()` 就是一条完整的看片链路；`play.header` 一起传过去，鉴权源才播得动
+- `play.parse` / `play.jx` 为 `'1'` 的线路拿到的是网页地址，把整份 `play` 交给 `ant.player.open()`，宿主会去解析和嗅探（见 4.6）
 
 ### 4.8 事件与生命周期
 
@@ -443,6 +463,71 @@ http://192.168.1.7:9321/<lanToken>
   `ant.request` 出网能力）交给同网段所有人。
 - 服务自己那一层的鉴权照常生效——比如 danmu_api 改过 `TOKEN` 的话，路径要写成
   `http://IP:9321/<lanToken>/<你的TOKEN>/api/v2/…`。
+
+### 4.11 Node.js 服务：把后端跑进宿主的 node 里
+
+`ant.serve` 跑在 WebView 里，写不了文件、起不了原生依赖。如果你的服务本来就是一个
+Node 程序（express/fastify、npm 依赖、ffmpeg 脚本），可以直接把它打进小程序包，
+宿主会用内嵌 node（worker_threads）把它当独立 worker 跑起来。
+
+**manifest 声明**（需要 `node` 权限，这是重权限，安装详情里会显眼展示）：
+
+```json
+{
+  "appId": "com.logvar.danmu",
+  "entry": "index.html",
+  "permissions": ["node"],
+  "node": {
+    "entry": "server/index.js",
+    "config": "server/index.config.js"
+  }
+}
+```
+
+- `node.entry`：服务端主文件，**必须导出 `start(config)`**（可另导出 `stop()` 做清理）。
+- `node.config`：可选；不写时宿主会找 `entry` 同目录的 `index.config.js`，两个都没有
+  则 `start(null)`。
+- `entry`（WebView 入口页）仍然必填——你的包可以同时有前端页面和 Node 后端；
+  纯后端没有页面的，放一个占位 `index.html` 即可。
+- 包内可以带 `node_modules/`（上限 200MB / 10000 个文件），宿主不会跳过它，
+  `require` 包内依赖直接可用。
+
+**服务端代码契约**：
+
+```js
+// server/index.js
+module.exports = {
+  start: (config) => {
+    // config 来自 index.config.js（或 node.config），没有则为 null
+    // 监听端口用环境变量，别写死：
+    const port = Number(process.env.DEV_HTTP_PORT);
+    app.listen(port, '127.0.0.1');
+  },
+  stop: () => app.close(), // 可选，宿主停止服务时调用
+};
+```
+
+要在宿主的状态页里正确显示「运行中」，请用宿主注入的 `globalThis.catServerFactory`
+当 serverFactory（fastify/express 适配器里传一下即可）；不配也能跑，只是宿主探测
+就绪会更慢一些。
+
+**宿主怎么用你**：和 4.10 一样填 **`miniapp://<appId>[/path]`**，消费方零改动。声明了
+`node` 块的小程序**不需要**再声明 `service` 权限。解析时宿主会：
+
+1. 确保内嵌 node 管理器在跑；
+2. 以你的 appId 为 key、独立分组启动一个 worker（和视频源、别的小程序服务互不影响）；
+3. 轮询你的 `/check` 就绪（约 20s 超时）后返回实际端口地址。
+
+**生命周期**：
+
+- **按需自启**：任何一次解析地址都会拉起，不需要用户先打开小程序；
+- **手动启停**：小程序详情页有「Node 服务」区块（状态 + 启动/停止按钮）；
+  手动**停止只停当下**，下次消费方请求仍会自动拉起——彻底停用只能卸载；
+- **崩溃自愈**：worker 意外退出后，下次解析自动重启；
+- **升级/卸载**：宿主会先停 worker 再动安装目录。
+
+**平台限制**：Android x86 模拟器没有内嵌 node 运行时（与 Python 源同限制），这类设备
+上解析会按「无可用服务」处理。真机（ARM）和桌面端都支持。
 
 ## 5. 打包与发版
 

@@ -339,6 +339,9 @@
    *
    * 统一走 source.play：CMS 源会原样回显地址，爬虫源会去解析，
    * 两种情况调用方都不用区分。
+   *
+   * parse / jx 为 '1' 的线路拿到的是网页地址：整份结果交给 ant.player.open，
+   * 由宿主去解析和嗅探（宿主 SDK v4 起支持，老宿主只能提示换线路）。
    */
   function playEpisode(siteKey, vod, line, episode) {
     var title = (vod.vod_name || '播放') + ' · ' + episode.name;
@@ -351,21 +354,33 @@
         var needSniff =
           info && (String(info.parse) === '1' || String(info.jx) === '1');
 
-        if (needSniff) {
-          var e = new Error('这条线路需要宿主内置解析，小程序里放不了，换一条线路试试');
-          e.code = 'NEED_SNIFF';
-          throw e;
-        }
         if (!url && /^https?:/i.test(episode.id)) url = episode.id;
         if (!url) {
           var e2 = new Error('没有拿到可播放地址');
           e2.code = 'NO_URL';
           throw e2;
         }
-        if (info && info.header && Object.keys(info.header).length) {
-          ant.log('该地址带请求头，当前 player.open 不支持下发，可能取流失败');
+        if (needSniff && !(ant.version >= 4)) {
+          var e = new Error('这条线路需要宿主内置解析，当前宿主版本还不支持，换一条线路试试');
+          e.code = 'NEED_SNIFF';
+          throw e;
         }
-        return ant.player.open({ url: url, title: title });
+        if (info && info.header && Object.keys(info.header).length) {
+          ant.log('该地址带请求头，一并交给播放器: ' + Object.keys(info.header).join(', '));
+        }
+        if (needSniff) ant.log('这条线路要宿主解析，交给宿主嗅探: ' + url);
+        return ant.player.open({
+          url: url,
+          title: title,
+          headers: info && info.header,
+          // 解析线路要靠这几个字段决定宿主用哪些解析源，别只传 url。
+          parse: info && info.parse,
+          jx: info && info.jx,
+          playUrl: info && info.playUrl,
+          flag: (info && info.flag) || line.name,
+          jxFrom: info && info.jxFrom,
+          key: info && info.key
+        });
       })
       .then(function () {
         return setLastEp(siteKey, String(vod.vod_id), {

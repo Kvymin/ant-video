@@ -321,20 +321,37 @@
 
   /* ---------------- 播放器 ---------------- */
 
+  /* source.play 的结果里「怎么解析这个地址」的字段，原样透传给宿主播放页。
+     click 不在其中：点击规则宿主只认站点配置里的那份，传 key 让它去查。 */
+  var PLAY_INFO_FIELDS = ['parse', 'jx', 'playUrl', 'flag', 'jxFrom', 'key'];
+
   var player = {
     /**
      * 推到宿主全屏播放页；退出播放页会收到 player.close 事件。
      *
      * options.headers 是取流请求头（Referer / User-Agent / Cookie / 鉴权头），
      * ant.source.play 返回的 header 可以直接原样传进来。
+     *
+     * 需要解析的线路（source.play 返回 parse / jx 为 '1'，url 是网页地址而不是
+     * 媒体直链）把整份结果传回来即可：`ant.player.open({...play, title})`，
+     * 宿主会跑自己的解析竞速 + 网页嗅探。自己抓站点、没有这些字段的小程序用
+     * options.sniff = true 显式声明同一件事。
      */
     open: function (options) {
       var opts = typeof options === 'string' ? { url: options } : options || {};
-      return invoke('player.open', {
+      var params = {
         url: opts.url,
         title: opts.title,
         headers: opts.headers || opts.header
-      });
+      };
+      if (opts.sniff) params.sniff = true;
+      for (var i = 0; i < PLAY_INFO_FIELDS.length; i++) {
+        var name = PLAY_INFO_FIELDS[i];
+        if (opts[name] !== undefined && opts[name] !== null) {
+          params[name] = opts[name];
+        }
+      }
+      return invoke('player.open', params);
     },
     getState: function () {
       return invoke('player.getState', {});
@@ -418,7 +435,7 @@
 
   window.ant = {
     /** SDK 协议版本，与宿主 env.getSystemInfo().sdkVersion 对应。 */
-    version: 3,
+    version: 4,
     invoke: invoke,
     on: on,
     off: off,
@@ -459,4 +476,110 @@
       return on('app.hide', handler);
     }
   };
+
+  /* ---------------- 故障上报 ---------------- */
+
+  /*
+   * 未捕获异常、未处理的 Promise 拒绝、子资源加载失败，一律送进宿主日志面板。
+   *
+   * 这三类都**不经过 console.***，所以宿主的 onConsoleMessage 抓不到；子资源
+   * 加载失败在 iOS 上也不会触发 onReceivedError。少了这一段，「页面画出来了但
+   * 功能没起来」在日志里就是一片空白——最典型的是 <script type="module"> 里
+   * 有一条这台设备的 WebKit 不认的语法（如 iOS 16.4 之前的正则后行断言），
+   * 整个模块一行都不执行，页面只会一直停在它自己的「加载中」上。
+   */
+  var reportCount = 0;
+  var reportLimit = 30;
+
+  function report(text) {
+    if (reportCount >= reportLimit) return;
+    reportCount++;
+    var message = text;
+    if (reportCount === reportLimit) message += '（达到上限，后续错误不再上报）';
+    try {
+      // 必须吃掉这里的 reject：上报失败再产生一次 unhandledrejection 就是死循环。
+      invoke('log', { message: message, level: 'error' }).catch(function () {});
+    } catch (e) {
+      /* 上报本身不能再抛 */
+    }
+  }
+
+  function describeError(error) {
+    if (error === null || error === undefined) return '';
+    var text = error.message ? String(error.message) : String(error);
+    if (error.name && text.indexOf(error.name) !== 0) {
+      text = error.name + ': ' + text;
+    }
+    if (error.stack) {
+      var frames = String(error.stack).split('\n').slice(0, 4).join(' ← ');
+      if (frames) text += ' | ' + frames;
+    }
+    return text;
+  }
+
+  // capture 阶段才能收到 script/img/link 的加载失败，它们不冒泡。
+  window.addEventListener(
+    'error',
+    function (event) {
+      var target = event.target;
+      if (target && target !== window && (target.src || target.href)) {
+        var url = target.src || target.href;
+        var tag = String(target.tagName || '?').toLowerCase();
+        report('资源加载失败 <' + tag + '> ' + url);
+        probeResource(url);
+        return;
+      }
+      var detail =
+        describeError(event.error) || String(event.message || '未知错误');
+      var where = event.filename
+        ? ' @' + event.filename + ':' + event.lineno + ':' + event.colno
+        : '';
+      report('未捕获异常 ' + detail + where);
+    },
+    true
+  );
+
+  /*
+   * `<script>` 的 error 事件不区分原因：取不到（网络/404/MIME 被拒）和
+   * 取到了但解析失败（module 里有本机 WebKit 不认的语法）都是同一个事件。
+   * 所以再取一次同一个地址，把 HTTP 状态和长度报出来——两类原因由此分开，
+   * 不然只能看到一句「资源加载失败」，什么也定不了。
+   */
+  function probeResource(url) {
+    if (typeof fetch !== 'function') return;
+    try {
+      fetch(url, { cache: 'no-store' })
+        .then(function (res) {
+          // 不读 body：这类文件动辄上兆，读进 JS 只是白占内存。
+          try {
+            if (res.body && res.body.cancel) res.body.cancel();
+          } catch (e) {
+            /* 取消失败就交给浏览器自己收尾 */
+          }
+          if (!res.ok) {
+            report('↳ 复查: HTTP ' + res.status + '，这个地址确实取不到');
+            return;
+          }
+          report(
+            '↳ 复查: HTTP ' +
+              res.status +
+              '，Content-Type=' +
+              (res.headers.get('content-type') || '?') +
+              '，Content-Length=' +
+              (res.headers.get('content-length') || '?') +
+              '。能取到却报加载失败 → 是脚本本身解析/执行失败，' +
+              'module 脚本常见于用了本机 WebKit 不支持的语法'
+          );
+        })
+        .catch(function (e) {
+          report('↳ 复查失败: ' + ((e && e.message) || e));
+        });
+    } catch (e) {
+      /* 复查是尽力而为 */
+    }
+  }
+
+  window.addEventListener('unhandledrejection', function (event) {
+    report('未处理的 Promise 拒绝 ' + (describeError(event.reason) || '(无原因)'));
+  });
 })();

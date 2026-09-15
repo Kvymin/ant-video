@@ -150,7 +150,7 @@ npx vite            # 有构建流程时
           appVersionCode: 0,
           devMode: true,
           permissions: declared || [],
-          sdkVersion: 3,
+          sdkVersion: 4,
           mock: true
         });
       }
@@ -365,6 +365,11 @@ npx vite            # 有构建流程时
           /* <video src> 发不出自定义头，真机上宿主会带上，浏览器里只能提示 */
           console.warn('[ant-mock] player.open 的 headers 在浏览器里无法生效（真机宿主会带上）:', Object.keys(headers).join(', '));
         }
+        var hostSniff = !!o.sniff || String(o.parse) === '1' || String(o.jx) === '1';
+        if (hostSniff) {
+          /* 网页地址要靠宿主的解析器 + WebView 嗅探，浏览器里放不了 */
+          console.warn('[ant-mock] player.open 这条线路要宿主解析/嗅探（parse/jx=1 或 sniff:true），浏览器里只会当直链打开:', o.url);
+        }
         emit('player.open', { url: o.url, title: o.title || o.url });
 
         var wrap = document.createElement('div');
@@ -396,7 +401,7 @@ npx vite            # 有构建流程时
           window.__antMockVideo = null;
           emit('player.close', { url: o.url });
         });
-        return Promise.resolve({ route: '/mock', url: o.url });
+        return Promise.resolve({ route: '/mock', url: o.url, sniff: hostSniff });
       },
       getState: function () {
         var v = window.__antMockVideo;
@@ -634,6 +639,7 @@ cd dist && zip -r ../my-app.zip . && cd ..
 | 权限门禁 | 只在配了 `__antMockPermissions` 时检查 | 始终按 manifest 声明检查 |
 | `ant.storage` | `localStorage`，容量按浏览器 | 文件，5MB 配额，超限 `QUOTA_EXCEEDED` |
 | `ant.player.open` | 页面内 `<video>` | 跳宿主全屏播放页（含 M3U8 代理与去广告） |
+| `ant.player.open` 的 `sniff` / `parse:'1'` | 当直链打开，只打一条 warn | 宿主跑解析器竞速 + WebView 嗅探取真实地址 |
 | `ant.source.*` | 你给的假数据 | 真站点，慢且可能失败 |
 | `ant.serve` | 只把 handler 挂到 `window.__antServe`，自己在 devtools 里调 | 宿主的本地服务真的会打进来；**dev server 实例没有这条通道** |
 | 后台运行 | 浏览器标签页节流 | 离屏但留在树里，JS 与定时器照常 |
