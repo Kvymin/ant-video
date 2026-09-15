@@ -139,8 +139,8 @@
       "version": "1.0.0",
       "versionCode": 1,
       "url": "https://ghfast.top/https://raw.githubusercontent.com/ant-video/ant-video/refs/heads/main/mini-app/market/zip/node-demo-v1.zip",
-      "md5": "70793c2e71301f5b86b140951a58677d",
-      "size": 3153,
+      "md5": "f4b09b174dd9686622a041857f8e18a4",
+      "size": 3179,
       "author": "leospring",
       "description": "演示小程序携带 Node.js 后端：宿主以 worker 跑包内 server/index.js，miniapp://com.leospring.node_demo 即服务地址，详情页可启停。需要支持 Node 服务的宿主版本"
     }

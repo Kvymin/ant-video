@@ -26,6 +26,7 @@
 | `renderer` | | 只能是 `webview`（缺省即此值）。`native` 是二期占位，写了会被拒绝安装 |
 | `entry` | | 首屏。包内 HTML（缺省 `index.html`，可带子目录如 `pages/index.html`），或 `http`/`https` 地址＝在线站点型小程序（包里只需 manifest，容器直接开那个站点）。其它协议与 `//host/path` 拒装 |
 | `permissions` | | 见下表。**没声明的能力一律调不通** |
+| `node` | | 包内 Node.js 服务：`{"entry": "server/index.js", "config": "server/index.config.js"}`（`config` 可选，缺省找 entry 同目录的 `index.config.js`，都没有则 `start(null)`）。声明了就必须有 `node` 权限，入口/配置文件必须存在于包内；宿主以 worker 运行 `entry`（需导出 `start(config)`，监听 `process.env.DEV_HTTP_PORT`），可带 `node_modules`（上限 200MB / 10000 文件），寻址同样用 `miniapp://<appId>`。见开发引导 §4.11 |
 | `network.allowlist` | | 两个用途：`ant.request` 能访问哪些域名（**不写等于不限制**）；WebView 能跳到哪些域名（**不写等于只能同源**，且导航不认 `*`，在线站点的登录域 / CDN 必须逐条写） |
 | `icon` | | 图标的**网络地址**（http/https）。不写、写包内相对路径或图挂了，都退回名称首字 |
 | `description` | | 一句话描述 |
@@ -52,6 +53,7 @@
 | `player` | `ant.player.*` |
 | `source` | `ant.source.*` |
 | `service` | `ant.serve`（反过来给宿主提供 HTTP 服务） |
+| `node` | manifest 的 `node` 块：包内 Node.js 服务由宿主以 worker 运行（manifest 级权限，没有对应的 `ant.*`） |
 
 `ant.env.getSystemInfo()`、`ant.log()`、`ant.on/off/once`、`ant.tv.onKey` 不需要权限。
 

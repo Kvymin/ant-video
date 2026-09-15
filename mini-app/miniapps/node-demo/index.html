@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Node 服务示例</title>
   <style>
     body {
@@ -11,6 +11,7 @@
       margin: 40px auto;
       padding: 0 16px;
       color: #333;
+      background: #fff;
       line-height: 1.7;
     }
     code {
@@ -36,7 +37,7 @@
     <b>验证方法</b>
     <ol>
       <li>在小程序详情页点「启动」，状态会显示 <code>运行中 · 端口 NNNN</code></li>
-      <li>浏览器或 curl 访问 <code>http://127.0.0.1:NNNN/hello</code></li>
+      <li>浏览器或 curl 访问 <code>127.0.0.1:NNNN/hello</code>（curl 默认走 http）</li>
       <li>或者在任何认 <code>miniapp://</code> 地址的设置里填
         <code>miniapp://com.leospring.node_demo/api/time</code>，
         宿主会自动拉起本服务再转发请求</li>

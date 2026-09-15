@@ -1,6 +1,6 @@
 ---
 name: miniapp-dev
-description: 为 flutter_ant_video 宿主开发、调试、校验和打包 HTML/JS/CSS 小程序。用于创建小程序、维护 manifest、调用 ant.storage/player/source/request/serve/miniApp、打开其它小程序或外部网站、制作在线站点型小程序、处理广告过滤兼容、TV 遥控、反向服务、局域网共享，以及排查 PERMISSION_DENIED、HOST_NOT_ALLOWED、APP_NOT_INSTALLED、MISSING_MANIFEST、ENTRY_MISSING、白屏和 dev server 问题。
+description: 为 flutter_ant_video 宿主开发、调试、校验和打包 HTML/JS/CSS 小程序。用于创建小程序、维护 manifest、调用 ant.storage/player/source/request/serve/miniApp、打开其它小程序或外部网站、制作在线站点型小程序、携带 Node.js 后端服务（node 块 + node 权限）、处理广告过滤兼容、TV 遥控、反向服务、局域网共享，以及排查 PERMISSION_DENIED、HOST_NOT_ALLOWED、APP_NOT_INSTALLED、MISSING_MANIFEST、ENTRY_MISSING、白屏和 dev server 问题。
 ---
 
 # 小程序开发（flutter_ant_video 宿主）
@@ -38,7 +38,8 @@ python3 "$SKILL/scripts/new_miniapp.py" \
 
 生成 `manifest.json` / `index.html` / `app.js` / `style.css` / `ant-mock.js`，硬规则（相对路径、
 `body` 背景、安全区、深色模式、TV 遥控焦点、mock 权限自检）已经预置好，直接往上写业务。
-`--permissions ui,storage,network,player,source,navigate,miniapp,service` 可指定权限，缺省 `ui,storage`。
+`--permissions ui,storage,network,player,source,navigate,miniapp,service,node` 可指定权限，缺省
+`ui,storage`；`--node` 额外生成 `server/` 骨架并声明 node 块（见 7.3）。
 
 不用脚手架就手写时，模板在 `$SKILL/assets/template/`，逐条对齐第 4 节硬规则。
 
@@ -252,6 +253,38 @@ Worker 风格的代码可以直接 `new URL(req.url)`。返回标准 `Response`�
 - 那个 token 就是唯一凭证，公共 WiFi 下开等于把你的服务（含出网能力）交给同网段所有人。
 
 现成例子：`danmu_api` 仓库的 `miniapp/`（`build-miniapp.js` 打包）。
+
+### 7.3 Node.js 后端服务：`node` 块 + `node` 权限
+
+`ant.serve` 跑在 WebView 里，写不了文件、装不了 npm 依赖。服务本身是 Node 程序时
+（express/fastify、node_modules、原生依赖），把它打进包、在 manifest 里声明 `node` 块，
+宿主会用**内嵌 node（worker_threads）**把 `server/index.js` 当独立 worker 跑——
+需要支持 Node 服务的宿主版本。
+
+```json
+{
+  "permissions": ["node"],
+  "node": { "entry": "server/index.js", "config": "server/index.config.js" }
+}
+```
+
+脚手架一键生成骨架（server 契约、`/check` 就绪口、`catServerFactory` 都预置好了）：
+
+```bash
+python3 scripts/new_miniapp.py --app-id com.foo.svc --name 我的服务 --node
+```
+
+服务端契约与要点：
+
+- `server/index.js` **必须导出 `start(config)`**，可另导出 `stop()` 做清理；`config`
+  来自 `index.config.js`（或 `node.config` 指定的文件），都没有则收到 `null`；
+- 监听端口用 `process.env.DEV_HTTP_PORT`，**不要写死**；`/check` 返回 200 是宿主的
+  就绪探测；经 `globalThis.catServerFactory` 起服务，宿主能立刻感知监听状态；
+- 包内可带 `node_modules/`（上限 200MB / 10000 文件，预检与打包都不会跳过它）；
+- 寻址与 `ant.serve` 一样填 **`miniapp://<appId>[/path]`**，不需要 `service` 权限；
+  宿主按需自启，小程序详情页可手动启停；升级/卸载时宿主先停 worker 再动目录；
+- Android x86 模拟器没有内嵌 node，那里按「无可用服务」处理；
+- 完整说明见开发引导 §4.11，示例 `miniapps/node-demo/`。
 
 ## 8. 排查
 

@@ -46,7 +46,12 @@ def main():
     else:
         out = src.parent / f"{src.name}-v{manifest['versionCode']}.zip"
 
-    files = check_miniapp.collect(src, check_miniapp.Report())
+    # node 型小程序的 node_modules 是运行期依赖，必须进包
+    # （collect 对普通包会把它当开发垃圾跳过）
+    keep_node_modules = isinstance(manifest.get("node"), dict)
+    files = check_miniapp.collect(
+        src, check_miniapp.Report(), keep_node_modules=keep_node_modules
+    )
     packed, hidden = [], []
     for rel, full in sorted(files):
         if any(part.startswith(".") for part in Path(rel).parts):
