@@ -42,15 +42,25 @@ mini-app/
 | **CMS 转 T4 服务** `miniapps/cms-t4-bridge/` | `com.leospring.cms_t4_bridge` | ui / storage / network / service | 配置多个 CMS JSON 接口，按 `site` 提供 T4 首页、分类、搜索、详情和 `config` 接口，页面给出可复制的内部与局域网地址 |
 | **采集源转 T4 服务** `miniapps/source-t4-bridge/` | `com.leospring.source_t4_bridge` | ui / storage / service / source | 复用宿主已配置的采集源，按 `site` 提供 T4 首页、分类、搜索、详情和播放接口（爬虫源由宿主解析），页面给出可复制的内部与局域网地址 |
 | **Node 服务示例** `miniapps/node-demo/` | `com.leospring.node_demo` | node | 演示把 Node.js 后端打进小程序包：宿主以 worker 起你的 `server/index.js`（可带 `node_modules`），`miniapp://com.leospring.node_demo` 即服务地址，详情页可手动启停。需要支持 Node 服务的宿主版本 |
+| **LogVar 弹幕服务（Node 版）** `miniapps/logvar-danmu-node/` | `com.logvar.danmu.node` | node | 真实的 Node 服务小程序：把上游 danmu_api 打成单个 CJS bundle 跑在宿主内嵌 node 里。目录内是宿主适配层与构建脚本，业务源码来自上游 checkout（AGPL-3.0） |
 | **俄罗斯方块** `miniapps/tetris/` | `com.leospring.tetris` | ui / storage / navigate | 掌机复刻，Web Audio 音效 + LCD 光影；自带 `ant-mock.js`，浏览器里直接能玩 |
 | **影视库** `miniapps/emby/` | `com.leospring.emby` | ui / storage / navigate / player / source | Emby 风格四页面（首页 / 媒体库 / 搜索 / 详情），复用宿主已配置的采集源，续播记录存 `ant.storage` |
 
 示例都以 `com.leospring.*` 命名，与宿主内置的 `com.ant.*` 分开 —— appId 是唯一键，撞了会被当成同一个小程序。体验跨小程序链路时先安装“启动参数接收器”，再打开“小程序启动台”。
 
-市场清单里还有一个 **LogVar 弹幕服务**（`com.logvar.danmu`），它演示的是**服务型小程序**：
-整个弹幕聚合服务跑在小程序里，播放器直接从它取弹幕，不用再自己部署 vercel / docker。
-源码不在本仓库，在上游 [huangxd-/danmu_api](https://github.com/huangxd-/danmu_api) 的 `miniapp/`
-目录（AGPL-3.0，包内附 `LICENSE` 与 `SOURCE.md`）。做法见下面的「服务型小程序」一节。
+市场清单里有两个 **LogVar 弹幕服务**，都演示**服务型小程序**：整个弹幕聚合服务跑在小程序里，
+播放器直接从它取弹幕，不用再自己部署 vercel / docker。
+
+- `com.logvar.danmu` —— **WebView 版**：服务跑在 WebView 里（`ant.serve`），配置页存在
+  `ant.storage`，权限要 `network`/`storage`/`ui`/`service`；适配层在上游
+  [huangxd-/danmu_api](https://github.com/huangxd-/danmu_api) 的 `miniapp/` 目录。
+- `com.logvar.danmu.node` —— **Node 版**：服务跑在宿主内嵌 node 里（worker_threads），
+  `fetch` 与 node 内置模块都是真的，权限只要 `node`。适配层在本仓库
+  `miniapps/logvar-danmu-node/`，构建方式见目录内 README。注意当前版本**没有配置界面**
+  （SDK 还没给页面访问本小程序 node 服务的通道），配置写在包内，改配置要重新打包。
+
+两者都基于 huangxd-/danmu_api（AGPL-3.0），包内附 `LICENSE` 与 `SOURCE.md`。
+做法见下面的「服务型小程序」一节。
 
 `demo` 里没有 `ant.serve` 的按钮 —— 声明 `service` 权限会让小程序被宿主后台拉起，
 对一个纯演示包不合适。要看活例子就装弹幕服务。
