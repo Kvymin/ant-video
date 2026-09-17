@@ -1,25 +1,18 @@
 import os from "os"
 import { printRed } from "./colorOut.js";
 
+const MOBILE_UA = "Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
+
 function getLocalIPv(ver = 4) {
   const ips = []
   const inter = os.networkInterfaces()
-  // console.dir(inter, { depth: null })
   for (let net in inter) {
-
-    // console.dir(net, { depth: null })
-    // console.log()
     for (let netPort of inter[net]) {
-      // netPort = inter[net][netPort]
-      // console.dir(netPort, { depth: null })
       if (netPort.family === `IPv${ver}`) {
-        // console.dir(netPort, { depth: null })
         ips.push(netPort.address)
       }
     }
   }
-  // console.log()
-  // console.dir(ips, { depth: null })
   return ips
 }
 
@@ -32,6 +25,10 @@ async function fetchUrl(url, opts = {}, timeout = 6000) {
   try {
     const res = await fetch(url, {
       ...opts,
+      headers: {
+        "User-Agent": MOBILE_UA,
+        ...(opts.headers || {}),
+      },
       signal: controller.signal
     });
     clearTimeout(timeoutId);

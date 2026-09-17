@@ -227,6 +227,7 @@ async function get302URL(resObj) {
       const obj = await fetch(`${resObj.url}`, {
         method: "GET",
         redirect: "manual",
+        headers: { "User-Agent": "Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36" },
         signal: controller.signal
       }).catch(err => {
         clearTimeout(timeoutId);

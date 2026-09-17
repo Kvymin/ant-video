@@ -22,11 +22,11 @@ function appendFile(filePath, content) {
 }
 
 function appendFileSync(filePath, content) {
-  fs.appendFileSync(filePath, content, error => {
-    if (error) {
-      throw new Error(`${filePath}:同步追加${content}失败`)
-    }
-  })
+  try {
+    fs.appendFileSync(filePath, content);
+  } catch (error) {
+    throw new Error(`${filePath}:同步追加${content}失败`);
+  }
 }
 
 function readFileSync(filePath) {
@@ -34,18 +34,18 @@ function readFileSync(filePath) {
 }
 
 function renameFileSync(oldFilePath, newFilePath) {
-  fs.renameSync(oldFilePath, newFilePath, err => {
-    if (err) {
-      throw new Error(`文件重命名失败${oldFilePath} -> ${newFilePath}`)
-    }
-  })
+  try {
+    fs.renameSync(oldFilePath, newFilePath);
+  } catch (err) {
+    throw new Error(`文件重命名失败${oldFilePath} -> ${newFilePath}`);
+  }
 }
 function copyFileSync(filePath, newFilePath, mode) {
-  fs.copyFileSync(filePath, newFilePath, mode, err => {
-    if (err) {
-      throw new Error(`文件复制失败${filePath} -> ${newFilePath}`)
-    }
-  })
+  try {
+    fs.copyFileSync(filePath, newFilePath, mode);
+  } catch (err) {
+    throw new Error(`文件复制失败${filePath} -> ${newFilePath}`);
+  }
 }
 
 export { createFile, writeFile, appendFile, appendFileSync, readFileSync, renameFileSync, copyFileSync }

@@ -45,10 +45,14 @@ function interfaceStr(url, headers, urlUserId, urlToken) {
     return result
   }
 
-  let replaceHost = `http://${headers.host}`
+  let replaceHost = `http://${headers.host || headers["x-forwarded-host"] || "127.0.0.1"}`
 
   if (host != "" && (headers["x-real-ip"] || headers["x-forwarded-for"] || host.indexOf(headers.host) != -1)) {
     replaceHost = host
+  }
+  // iOS WebView 可能未发送 host 头，降级为回环地址
+  if (!headers.host && !headers["x-forwarded-host"]) {
+    replaceHost = "http://127.0.0.1"
   }
 
   if (pass != "") {
