@@ -47,46 +47,30 @@
       transition: opacity 0.2s;
     }
     .copy-btn:hover { opacity: 0.8; }
-    .copy-btn.copied { color: #8ee7bb; }
-    .tip {
-      margin-top: 10px;
-      padding: 6px 10px;
-      font-size: 12px;
-      color: #8ee7bb;
-      background: #071a2c;
-      border-radius: 6px;
-      border: 1px solid #1e3a5f;
-      opacity: 0;
-      transition: opacity 0.2s;
-    }
-    .tip.show { opacity: 1; }
   </style>
 </head>
 <body>
   <main>
     <span class="tag">Node 服务型小程序</span>
-    <h1>咪咕直播源</h1>    <p>服务由宿主按需启动。请在小程序详情页确认 Node 服务为“运行中”，再把下面的逻辑地址交给支持 M3U/TXT 的功能。</p>
+    <h1>咪咕直播源</h1>
+    <p>服务由宿主按需启动。请在小程序详情页确认 Node 服务为“运行中”，再把下面的逻辑地址交给支持 M3U/TXT 的功能。</p>
     <section>
       <strong>常用地址</strong>
       <div class="addr-item">
         <code id="m3u">miniapp://com.leospring.migu_video.node/m3u</code>
-        <button class="copy-btn" data-target="m3u">复制</button>
-        <span class="tip" id="tip-m3u">✓ 已复制</span>
+        <button class="copy-btn" data-copy="m3u">复制</button>
       </div>
       <div class="addr-item">
         <code id="txt">miniapp://com.leospring.migu_video.node/txt</code>
-        <button class="copy-btn" data-target="txt">复制</button>
-        <span class="tip" id="tip-txt">✓ 已复制</span>
+        <button class="copy-btn" data-copy="txt">复制</button>
       </div>
       <div class="addr-item">
         <code id="epg">miniapp://com.leospring.migu_video.node/playback.xml</code>
-        <button class="copy-btn" data-target="epg">复制</button>
-        <span class="tip" id="tip-epg">✓ 已复制</span>
+        <button class="copy-btn" data-copy="epg">复制</button>
       </div>
       <div class="addr-item">
         <code id="status">miniapp://com.leospring.migu_video.node/status</code>
-        <button class="copy-btn" data-target="status">复制</button>
-        <span class="tip" id="tip-status">✓ 已复制</span>
+        <button class="copy-btn" data-copy="status">复制</button>
       </div>
     </section>
     <section>
@@ -95,39 +79,5 @@
     </section>
   </main>
   <script src="./app.js"></script>
-  <script>
-    (function () {
-      function copyToClipboard(text) {
-        if (navigator.clipboard && window.isSecureContext) {
-          return navigator.clipboard.writeText(text);
-        }
-        const el = document.createElement('textarea');
-        el.value = text;
-        el.style.position = 'fixed';
-        el.style.opacity = '0';
-        document.body.appendChild(el);
-        el.focus();
-        el.select();
-        try { document.execCommand('copy'); } finally { document.body.removeChild(el); }
-      }
-      document.querySelectorAll('.copy-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const target = btn.getAttribute('data-target');
-          const codeEl = document.getElementById(target);
-          const tip = document.getElementById('tip-' + target);
-          copyToClipboard(codeEl.textContent).then(() => {
-            tip.classList.add('show');
-            btn.classList.add('copied');
-            btn.textContent = '已复制';
-            setTimeout(() => {
-              tip.classList.remove('show');
-              btn.classList.remove('copied');
-              btn.textContent = '复制';
-            }, 1500);
-          });
-        });
-      });
-    })();
-  </script>
 </body>
 </html>
