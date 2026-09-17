@@ -6,19 +6,27 @@ function createFile(filePath) {
 }
 
 function writeFile(filePath, content) {
-  fs.writeFile(filePath, content, error => {
-    if (error) {
-      throw new Error(`${filePath}:写入${content}失败`)
-    }
-  })
+  return new Promise((resolve, reject) => {
+    fs.writeFile(filePath, content, error => {
+      if (error) {
+        reject(new Error(`${filePath}:写入${content}失败`));
+        return;
+      }
+      resolve();
+    });
+  });
 }
 
 function appendFile(filePath, content) {
-  fs.appendFile(filePath, content, error => {
-    if (error) {
-      throw new Error(`${filePath}:追加${content}失败`)
-    }
-  })
+  return new Promise((resolve, reject) => {
+    fs.appendFile(filePath, content, error => {
+      if (error) {
+        reject(new Error(`${filePath}:追加${content}失败`));
+        return;
+      }
+      resolve();
+    });
+  });
 }
 
 function appendFileSync(filePath, content) {

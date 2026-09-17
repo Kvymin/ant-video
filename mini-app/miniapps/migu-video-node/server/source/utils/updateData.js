@@ -27,15 +27,15 @@ async function updateTV(_hours) {
   // txt
   interfaceTXTPath = `${dataDir}/interfaceTXT.txt.bak`
   // 创建写入空内容
-  writeFile(interfacePath, "")
+  await writeFile(interfacePath, "")
   // txt
-  writeFile(interfaceTXTPath, "")
+  await writeFile(interfaceTXTPath, "")
 
-  appendFile(interfacePath, `#EXTM3U x-tvg-url="\${replace}/playback.xml" catchup="append" catchup-source="?playbackbegin=\${(b)yyyyMMddHHmmss}&playbackend=\${(e)yyyyMMddHHmmss}"\n`)
+  await appendFile(interfacePath, `#EXTM3U x-tvg-url="\${replace}/playback.xml" catchup="append" catchup-source="?playbackbegin=\${(b)yyyyMMddHHmmss}&playbackend=\${(e)yyyyMMddHHmmss}"\n`)
   printYellow("开始更新TV...")
   // 回放
   const playbackFile = `${dataDir}/playback.xml.bak`
-  writeFile(playbackFile,
+  await writeFile(playbackFile,
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<tv generator-info-name="Tak" generator-info-url="${host}">\n`)
 
@@ -49,16 +49,16 @@ async function updateTV(_hours) {
 
     const data = datas[i].dataList
     // txt
-    appendFile(interfaceTXTPath, `${datas[i].name},#genre#\n`)
+    await appendFile(interfaceTXTPath, `${datas[i].name},#genre#\n`)
     // 写入节目
     for (let j = 0; j < data.length; j++) {
 
       await updatePlaybackData(data[j], playbackFile)
 
       // 写入节目
-      appendFile(interfacePath, `#EXTINF:-1 tvg-id="${data[j].name}" tvg-name="${data[j].name}" tvg-logo="${data[j].pics.highResolutionH}" group-title="${datas[i].name}",${data[j].name}\n\${replace}/${data[j].pID}\n`)
+      await appendFile(interfacePath, `#EXTINF:-1 tvg-id="${data[j].name}" tvg-name="${data[j].name}" tvg-logo="${data[j].pics.highResolutionH}" group-title="${datas[i].name}",${data[j].name}\n\${replace}/${data[j].pID}\n`)
       // txt
-      appendFile(interfaceTXTPath, `${data[j].name},\${replace}/${data[j].pID}\n`)
+      await appendFile(interfaceTXTPath, `${data[j].name},\${replace}/${data[j].pID}\n`)
       // printGreen(`    节目链接更新成功`)
     }
     printGreen(`分类###:${datas[i].name} 更新完成！`)
@@ -91,9 +91,9 @@ async function updatePE(_hours) {
   // 屏蔽所有TV分类
   if (ignoreCategorySet.has("TV")) {
     // 创建写入开头
-    writeFile(`${dataDir}/interface.txt.bak`, `#EXTM3U x-tvg-url="\${replace}/playback.xml" catchup="append" catchup-source="?playbackbegin=\${(b)yyyyMMddHHmmss}&playbackend=\${(e)yyyyMMddHHmmss}"\n`)
+    await writeFile(`${dataDir}/interface.txt.bak`, `#EXTM3U x-tvg-url="\${replace}/playback.xml" catchup="append" catchup-source="?playbackbegin=\${(b)yyyyMMddHHmmss}&playbackend=\${(e)yyyyMMddHHmmss}"\n`)
     // txt
-    writeFile(`${dataDir}/interfaceTXT.txt.bak`, "")
+    await writeFile(`${dataDir}/interfaceTXT.txt.bak`, "")
   } else {
     copyFileSync(`${dataDir}/interface.txt`, `${dataDir}/interface.txt.bak`, 0)
     copyFileSync(`${dataDir}/interfaceTXT.txt`, `${dataDir}/interfaceTXT.txt.bak`, 0)
@@ -120,7 +120,7 @@ async function updatePE(_hours) {
       continue
     }
 
-    appendFile(interfaceTXTPath, `体育-${relativeDate},#genre#\n`)
+    await appendFile(interfaceTXTPath, `体育-${relativeDate},#genre#\n`)
     for (const data of datas.body?.matchList[date]) {
 
       let pkInfoTitle = data.pkInfoTitle
