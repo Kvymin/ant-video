@@ -154,6 +154,24 @@
       "size": 3179,
       "author": "leospring",
       "description": "演示小程序携带 Node.js 后端：宿主以 worker 跑包内 server/index.js，miniapp://com.leospring.node_demo 即服务地址，详情页可启停。需要支持 Node 服务的宿主版本"
+    },
+    {
+      "appId": "com.leospring.drpy_node",
+      "name": "drpy-node 影视源 (Node)",
+      "version": "1.1.0",
+      "versionCode": 3,
+      "url": "https://ghfast.top/https://raw.githubusercontent.com/ant-video/ant-video/refs/heads/main/mini-app/market/zip/drpy-node-v3.zip",
+      "author": "leospring",
+      "description": "将 drpy-node/drpyS 作为宿主内嵌 Node 服务运行，提供影视源聚合、规则执行和解析接口"
+    },
+    {
+      "appId": "com.leospring.migu_video.node",
+      "name": "咪咕直播源 (Node)",
+      "version": "1.0.0",
+      "versionCode": 1,
+      "url": "https://ghfast.top/https://raw.githubusercontent.com/ant-video/ant-video/refs/heads/main/mini-app/market/zip/migu-video-node-v1.zip",
+      "author": "leospring",
+      "description": "将 migu_video 作为宿主内嵌 Node 服务运行，提供 M3U、TXT、EPG 和频道取流接口"
     }
   ]
 }

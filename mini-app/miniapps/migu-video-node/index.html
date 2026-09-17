@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>咪咕直播源</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: calc(28px + env(safe-area-inset-top)) 22px calc(28px + env(safe-area-inset-bottom));
+      color: #eef4ff;
+      background: linear-gradient(150deg, #07111f, #102c47 58%, #0b1726);
+    }
+    main { width: min(720px, 100%); margin: 0 auto; }
+    h1 { margin: 0 0 10px; font-size: 30px; }
+    p { color: #b9c9dc; line-height: 1.7; }
+    section { margin-top: 22px; padding: 18px; border: 1px solid #2c4b67; border-radius: 16px; background: #0c1b2bbb; }
+    code { color: #74d8ff; overflow-wrap: anywhere; }
+    ul { padding-left: 20px; line-height: 1.8; }
+    .tag { display: inline-block; padding: 5px 10px; border-radius: 99px; color: #8ee7bb; background: #12372a; }
+  </style>
+</head>
+<body>
+  <main>
+    <span class="tag">Node 服务型小程序</span>
+    <h1>咪咕直播源</h1>
+    <p>服务由宿主按需启动。请在小程序详情页确认 Node 服务为“运行中”，再把下面的逻辑地址交给支持 M3U/TXT 的功能。</p>
+    <section>
+      <strong>常用地址</strong>
+      <ul>
+        <li>M3U：<code>miniapp://com.leospring.migu_video.node/m3u</code></li>
+        <li>TXT：<code>miniapp://com.leospring.migu_video.node/txt</code></li>
+        <li>EPG：<code>miniapp://com.leospring.migu_video.node/playback.xml</code></li>
+        <li>状态：<code>miniapp://com.leospring.migu_video.node/status</code></li>
+      </ul>
+    </section>
+    <section>
+      <strong>配置说明</strong>
+      <p>默认使用游客高清模式。账号、Token、清晰度、访问密码和分类选项位于 <code>server/index.config.js</code>。原项目明确提示登录存在封号风险，请谨慎填写账号信息。</p>
+    </section>
+  </main>
+  <script src="./app.js"></script>
+</body>
+</html>
