@@ -81,6 +81,11 @@ function readVersion() {
 
 const version = readVersion();
 const minify = process.argv.includes('--minify');
+// --bump [N]：适配层自己发版时给 versionCode 加 N（缺省 1）。versionCode 默认从上游
+// danmu_api 版本推导，只改适配层（页面、权限、宿主契约）不改上游时，靠它让用户收到更新。
+const bumpIndex = process.argv.indexOf('--bump');
+const bump =
+  bumpIndex >= 0 ? parseInt(process.argv[bumpIndex + 1], 10) || 1 : 0;
 const outDir = 'dist/miniapp-node';
 const bundleName = 'danmu-service.cjs';
 
@@ -88,6 +93,7 @@ const bundleName = 'danmu-service.cjs';
 const staticFiles = [
   ['manifest.json', 'manifest.json'],
   ['index.html', 'index.html'],
+  ['app.js', 'app.js'],
   ['service/index.js', 'server/index.js'],
   ['service/index.config.js', 'server/index.config.js'],
   // 标记 package 目录为 CommonJS。宿主的加载器是 require()，而 require 的语义
@@ -211,7 +217,7 @@ export function createCluster() { throw new Error('redis not available in probe 
     const manifestPath = path.join(outDir, 'manifest.json');
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     manifest.version = version;
-    manifest.versionCode = versionCodeOf(version);
+    manifest.versionCode = versionCodeOf(version) + bump;
     fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
     const size = fs.statSync(bundlePath).size;
