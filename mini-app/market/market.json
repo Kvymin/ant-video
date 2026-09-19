@@ -167,11 +167,11 @@
     {
       "appId": "com.leospring.migu_video.node",
       "name": "咪咕直播源 (Node)",
-      "version": "1.0.3",
+      "version": "1.0.4",
       "versionCode": 5,
-      "url": "https://ghfast.top/https://raw.githubusercontent.com/ant-video/ant-video/refs/heads/main/mini-app/market/zip/migu-video-node-v1.zip",
-      "md5": "b52f933895fb51762c143712259dbbf3",
-      "size": 89306,
+      "url": "https://ghfast.top/https://raw.githubusercontent.com/ant-video/ant-video/refs/heads/main/mini-app/market/zip/migu-video-node-v5.zip",
+      "md5": "a6d323ed7a44ec94e340af9f4e224d72",
+      "size": 87566,
       "author": "leospring",
       "description": "将 migu_video 作为宿主内嵌 Node 服务运行，提供 M3U、TXT、EPG 和频道取流接口。界面地址支持一键复制。"
     }
