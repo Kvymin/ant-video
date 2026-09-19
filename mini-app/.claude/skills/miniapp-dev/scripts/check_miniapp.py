@@ -25,6 +25,9 @@ SDK_FILES = {"ant-mock.js", "ant-sdk.js"}
 MAX_ENTRY_SIZE = 20 * 1024 * 1024
 MAX_TOTAL_SIZE = 100 * 1024 * 1024
 MAX_ENTRY_COUNT = 2000
+# 声明了 node 块的包单列上限，与宿主安装器对齐（node_modules 文件数轻松过通用上限）
+NODE_MAX_TOTAL_SIZE = 200 * 1024 * 1024
+NODE_MAX_ENTRY_COUNT = 10000
 
 APP_ID_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)+$")
 KNOWN_PERMS = [
@@ -36,6 +39,7 @@ KNOWN_PERMS = [
     "player",
     "source",
     "service",
+    "node",
 ]
 
 # ant.<第一段> → 需要的权限。不在表里的第一段不需要权限。
@@ -110,15 +114,20 @@ def is_blocked_host(host):
     return False
 
 
-def collect(root, report):
-    """走一遍会被真正打进包的文件，同时记录符号链接与被跳过的开发目录。"""
+def collect(root, report, keep_node_modules=False):
+    """走一遍会被真正打进包的文件，同时记录符号链接与被跳过的开发目录。
+
+    node 型小程序的 node_modules 是运行期依赖，keep_node_modules=True 时
+    不当开发垃圾跳过（与宿主安装器同一条规则）。
+    """
+    skipped_dirs = SKIPPED_DIRS - ({"node_modules"} if keep_node_modules else set())
     files = []
     symlinks = []
     skipped = []
     for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
         for name in list(dirnames):
             full = Path(dirpath) / name
-            if name in SKIPPED_DIRS:
+            if name in skipped_dirs:
                 skipped.append(str(full.relative_to(root)))
                 dirnames.remove(name)
             elif full.is_symlink():
@@ -142,17 +151,22 @@ def collect(root, report):
     return files
 
 
-def check_limits(files, report):
+def check_limits(files, report, node_app=False):
+    entry_limit = NODE_MAX_ENTRY_COUNT if node_app else MAX_ENTRY_COUNT
+    total_limit = NODE_MAX_TOTAL_SIZE if node_app else MAX_TOTAL_SIZE
     total = 0
     for rel, full in files:
         size = full.stat().st_size
         total += size
         if size > MAX_ENTRY_SIZE:
             report.error("ENTRY_TOO_LARGE", f"单文件超过 20MB：{rel}（{size / 1048576:.1f}MB）")
-    if len(files) > MAX_ENTRY_COUNT:
-        report.error("TOO_MANY_ENTRIES", f"文件数 {len(files)} 超过上限 {MAX_ENTRY_COUNT}")
-    if total > MAX_TOTAL_SIZE:
-        report.error("TOTAL_TOO_LARGE", f"总体积 {total / 1048576:.1f}MB 超过上限 100MB")
+    if len(files) > entry_limit:
+        report.error("TOO_MANY_ENTRIES", f"文件数 {len(files)} 超过上限 {entry_limit}")
+    if total > total_limit:
+        report.error(
+            "TOTAL_TOO_LARGE",
+            f"总体积 {total / 1048576:.1f}MB 超过上限 {total_limit // 1048576}MB",
+        )
     unit = f"{total / 1048576:.2f}MB" if total >= 1048576 else f"{total / 1024:.1f}KB"
     report.note(f"共 {len(files)} 个文件、{unit}")
 
@@ -186,6 +200,20 @@ def check_remote_entry(entry, report):
     if parsed.scheme == "http":
         report.warn("INSECURE_ENTRY", f"在线入口走的是明文 http：{entry}，页面能被改包且拿着宿主权限，建议上 https")
     return True
+
+
+def _node_path_ok(path):
+    """node 路径只接受包内相对路径，与宿主 MiniAppManifest._ensureValidNodePath 对齐。"""
+    if not path:
+        return False
+    parsed = urlsplit(path)
+    if parsed.scheme or parsed.netloc:
+        return False
+    if path.startswith("/") or path.startswith("\\"):
+        return False
+    if re.match(r"^[A-Za-z]:", path):
+        return False
+    return ".." not in path.replace("\\", "/").split("/")
 
 
 def check_manifest(root, report):
@@ -240,6 +268,32 @@ def check_manifest(root, report):
             f"无法识别的权限会被静默忽略：{unknown}；可选 {'/'.join(KNOWN_PERMS)}",
         )
 
+    # node 块：包内 Node.js 服务（宿主以 worker_threads 跑 server 代码）。
+    # 与宿主安装器同一条规则：块存在就必须有 node 权限、入口必须在包里。
+    node_dir = None
+    raw_node = data.get("node")
+    if raw_node is not None:
+        if not isinstance(raw_node, dict):
+            report.error("INVALID_NODE_BLOCK", f"node 必须是对象：{raw_node!r}")
+        else:
+            node_entry = str(raw_node.get("entry") or "").strip()
+            if not node_entry:
+                report.error("INVALID_NODE_ENTRY", "node.entry 不能为空")
+            elif not _node_path_ok(node_entry):
+                report.error("INVALID_NODE_ENTRY", f"node.entry 必须是包内相对路径：{node_entry}")
+            elif not (root / node_entry).is_file():
+                report.error("NODE_ENTRY_MISSING", f"node.entry 指向的文件不存在：{node_entry}")
+            else:
+                node_dir = str(Path(node_entry).parent)
+            node_config = str(raw_node.get("config") or "").strip()
+            if node_config:
+                if not _node_path_ok(node_config):
+                    report.error("INVALID_NODE_ENTRY", f"node.config 必须是包内相对路径：{node_config}")
+                elif not (root / node_config).is_file():
+                    report.error("NODE_CONFIG_MISSING", f"node.config 指向的文件不存在：{node_config}")
+            if "node" not in perms:
+                report.error("NODE_PERMISSION_MISSING", "声明了 node 块就必须声明 node 权限")
+
     icon = str(data.get("icon", "")).strip()
     if icon and not icon.startswith(("http://", "https://")):
         report.warn("ICON_NOT_URL", f"icon 只认 http/https 网络地址，包内路径会退回名称首字：{icon}")
@@ -258,6 +312,7 @@ def check_manifest(root, report):
         "remote_entry": remote_entry,
         "permissions": [p for p in perms if p in KNOWN_PERMS],
         "allowlist": allowlist,
+        "node_dir": node_dir,
     }
 
 
@@ -309,7 +364,15 @@ def scan(root, files, manifest, report):
     has_tv_key = uses_invoke = body_bg = False
     entry_text = ""
 
+    # node 服务端目录跑在 worker 里而不是 WebView 里：ant.* / 回环地址 /
+    # body 背景 / TV 按键这些 WebView 检查对它全是假阳性，跳过。
+    node_dir = manifest.get("node_dir")
+    node_prefix = (node_dir + "/") if node_dir else None
+
     for rel, full in files:
+        rel_posix = rel.replace("\\", "/")
+        if node_prefix and rel_posix.startswith(node_prefix):
+            continue
         ext = full.suffix.lower()
         if ext != ".css" and ext not in SCAN_EXT:
             continue
@@ -365,7 +428,9 @@ def scan(root, files, manifest, report):
     for perm, where in sorted(referenced.items()):
         if perm not in declared and perm not in called:
             report.warn("MISSING_PERMISSION", f'{where} 引用了 "{perm}" 能力但没声明该权限')
-    for perm in sorted(declared - (set(called) | set(referenced))):
+    # node 是 manifest 级权限（node 块本身就是使用），没有对应的 ant.* 可反查
+    unused = declared - {"node"} - (set(called) | set(referenced))
+    for perm in sorted(unused):
         report.warn("UNUSED_PERMISSION", f'声明了 "{perm}" 但代码里没用到，按需申请')
     if uses_invoke:
         report.warn("RAW_INVOKE", "用了 ant.invoke()，静态推断不出它需要哪些权限，请自行核对")
@@ -380,6 +445,13 @@ def scan(root, files, manifest, report):
         report.note(
             "声明了 miniapp：只能由当前可见的前台页面响应用户操作调用 open；"
             "目标必须已安装，宿主每次都会让用户确认",
+        )
+    if "node" in declared or node_dir:
+        report.note(
+            "声明了 node：server 代码会由宿主以内嵌 node worker 运行（需要支持 Node 服务的宿主版本）。"
+            "start(config) 里监听 process.env.DEV_HTTP_PORT；要宿主立刻感知监听状态就用 "
+            "globalThis.catServerFactory；node_modules 会随包安装（上限 200MB / 10000 文件）。"
+            "宿主按需自启（miniapp://<appId>），详情页可手动启停",
         )
 
     for rel in dict.fromkeys(abs_refs):
@@ -431,9 +503,11 @@ def main(argv):
 
     print(f"检查 {root}\n")
     report = Report()
-    files = collect(root, report)
-    check_limits(files, report)
+    # 先看 manifest：node 型小程序的 collect（node_modules 不跳）和上限都要按包型走
     manifest = check_manifest(root, report)
+    node_app = bool(manifest and manifest.get("node_dir"))
+    files = collect(root, report, keep_node_modules=node_app)
+    check_limits(files, report, node_app=node_app)
     if manifest and manifest["remote_entry"]:
         # 页面代码在别人服务器上，静态检查无从下手，只能核 manifest 并点出人工项。
         report.note(f"在线站点型小程序，入口：{manifest['entry']}")
